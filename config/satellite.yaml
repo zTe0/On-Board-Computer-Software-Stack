@@ -1,0 +1,38 @@
+# =============================================================
+#  obcsw — Satellite Configuration
+#  Loaded at startup by ConfigLoader::load()
+# =============================================================
+
+satellite:
+  name: "LOFT-1"
+  mission_id: "MISSION-ALPHA-2025"
+  software_version: "1.0.0"
+
+telemetry:
+  dispatch_interval_ms: 1000      # how often the dispatcher thread wakes
+  max_frame_queue_depth: 64       # frames buffered before drop
+
+  udp:
+    ground_station_ip: "127.0.0.1"
+    ground_station_port: 5005     # outbound to ground station
+    bind_port: 5004               # inbound uplink port
+
+command:
+  max_queue_depth: 32
+  command_timeout_ms: 5000
+
+health:
+  watchdog_interval_ms: 2000
+
+  fault_thresholds:
+    # Power
+    battery_voltage_min_v: 6.5
+    battery_voltage_max_v: 8.4
+
+    # Thermal
+    temperature_min_c: -20.0
+    temperature_max_c: 85.0
+
+    # OBC resources
+    cpu_usage_max_pct: 90
+    memory_usage_max_pct: 85

@@ -1,0 +1,17 @@
+# render.yaml — Deploy the web dashboard as a Render Static Site
+# https://render.com/docs/blueprint-spec
+
+services:
+  - type: web
+    name: obcsw-portfolio
+    runtime: static
+    buildCommand: echo "No build step needed"
+    staticPublishPath: ./web
+    headers:
+      - path: /*
+        name: Cache-Control
+        value: "public, max-age=3600"
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html

@@ -1,0 +1,698 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>obcsw — Satellite OBC Software</title>
+<style>
+  /* ── Design tokens ─────────────────────────────────────────────
+     Palette: deep-space navy + amber telemetry + cyan command
+     Type: JetBrains Mono (monospace authority) + Inter (body clarity)
+     Signature: animated live telemetry feed that acts as the hero
+  ─────────────────────────────────────────────────────────────── */
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Inter:wght@300;400;500;600&display=swap');
+
+  :root {
+    --space-950: #040810;
+    --space-900: #080f1f;
+    --space-800: #0d1830;
+    --space-700: #152040;
+    --space-600: #1e2e52;
+    --grid-line: rgba(100,150,255,0.07);
+    --amber:     #f59e0b;
+    --amber-dim: #92600a;
+    --cyan:      #22d3ee;
+    --cyan-dim:  #0e7490;
+    --green:     #4ade80;
+    --red:       #f87171;
+    --text-hi:   #e2e8f0;
+    --text-mid:  #94a3b8;
+    --text-lo:   #475569;
+    --mono:      'JetBrains Mono', monospace;
+    --sans:      'Inter', sans-serif;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--space-950);
+    color: var(--text-hi);
+    font-family: var(--sans);
+    font-size: 15px;
+    line-height: 1.6;
+    overflow-x: hidden;
+  }
+
+  /* ── Star-field canvas ──────────────────────────────────────── */
+  #starfield {
+    position: fixed; inset: 0; z-index: 0; pointer-events: none;
+    opacity: 0.5;
+  }
+
+  /* ── Grid overlay ───────────────────────────────────────────── */
+  body::before {
+    content: '';
+    position: fixed; inset: 0; z-index: 0; pointer-events: none;
+    background-image:
+      linear-gradient(var(--grid-line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+    background-size: 60px 60px;
+  }
+
+  /* ── Layout wrapper ─────────────────────────────────────────── */
+  .page { position: relative; z-index: 1; max-width: 1100px; margin: 0 auto; padding: 0 24px; }
+
+  /* ── Nav ────────────────────────────────────────────────────── */
+  nav {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 20px 0; border-bottom: 1px solid var(--grid-line);
+  }
+  .nav-logo {
+    font-family: var(--mono); font-size: 13px; font-weight: 600;
+    color: var(--cyan); letter-spacing: 0.08em;
+  }
+  .nav-logo span { color: var(--amber); }
+  .nav-links { display: flex; gap: 24px; list-style: none; }
+  .nav-links a {
+    font-size: 12px; font-weight: 500; color: var(--text-mid);
+    text-decoration: none; letter-spacing: 0.06em; text-transform: uppercase;
+    transition: color .2s;
+  }
+  .nav-links a:hover { color: var(--cyan); }
+
+  /* ── Hero ───────────────────────────────────────────────────── */
+  .hero {
+    padding: 80px 0 60px;
+    display: grid; grid-template-columns: 1fr 1fr; gap: 48px; align-items: center;
+  }
+  .hero-eyebrow {
+    font-family: var(--mono); font-size: 11px; font-weight: 600;
+    color: var(--cyan); letter-spacing: 0.14em; text-transform: uppercase;
+    margin-bottom: 16px;
+  }
+  .hero-eyebrow::before { content: '> '; color: var(--amber); }
+  h1 {
+    font-family: var(--mono); font-size: clamp(28px, 4vw, 44px);
+    font-weight: 700; line-height: 1.15;
+    color: var(--text-hi);
+    margin-bottom: 16px;
+  }
+  h1 em { color: var(--amber); font-style: normal; }
+  .hero-sub {
+    color: var(--text-mid); font-size: 15px; line-height: 1.7;
+    max-width: 460px;
+  }
+  .hero-ctas { display: flex; gap: 12px; margin-top: 28px; flex-wrap: wrap; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 7px;
+    font-family: var(--mono); font-size: 12px; font-weight: 600;
+    letter-spacing: 0.06em; text-transform: uppercase;
+    padding: 10px 20px; border-radius: 4px; text-decoration: none;
+    border: 1px solid transparent; cursor: pointer; transition: all .2s;
+  }
+  .btn-primary { background: var(--cyan); color: var(--space-950); }
+  .btn-primary:hover { background: #67e8f9; }
+  .btn-outline { border-color: var(--amber); color: var(--amber); background: transparent; }
+  .btn-outline:hover { background: rgba(245,158,11,0.1); }
+
+  /* ── Live telemetry terminal (hero right) ───────────────────── */
+  .terminal {
+    background: var(--space-900);
+    border: 1px solid var(--space-600);
+    border-radius: 8px;
+    overflow: hidden;
+    font-family: var(--mono);
+    font-size: 11px;
+    box-shadow: 0 0 60px rgba(34,211,238,0.06);
+  }
+  .term-bar {
+    background: var(--space-800);
+    padding: 10px 14px;
+    display: flex; align-items: center; gap: 8px;
+    border-bottom: 1px solid var(--space-600);
+  }
+  .dot { width: 10px; height: 10px; border-radius: 50%; }
+  .dot-r { background: #f87171; }
+  .dot-y { background: var(--amber); }
+  .dot-g { background: var(--green); }
+  .term-title {
+    margin-left: auto; color: var(--text-lo); font-size: 10px; letter-spacing: 0.06em;
+  }
+  .term-body { padding: 16px; min-height: 320px; max-height: 340px; overflow: hidden; }
+  .term-line { margin: 2px 0; line-height: 1.5; }
+  .t-ts  { color: var(--text-lo); }
+  .t-tag { color: var(--cyan); font-weight: 600; }
+  .t-ok  { color: var(--green); }
+  .t-warn{ color: var(--amber); }
+  .t-err { color: var(--red); }
+  .t-val { color: var(--text-hi); }
+  .cursor { display: inline-block; width: 7px; height: 12px; background: var(--cyan); animation: blink 1s step-end infinite; vertical-align: text-bottom; }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  /* ── Section labels ─────────────────────────────────────────── */
+  .section { padding: 64px 0; border-top: 1px solid var(--grid-line); }
+  .section-label {
+    font-family: var(--mono); font-size: 10px; font-weight: 600;
+    color: var(--cyan); letter-spacing: 0.18em; text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  h2 {
+    font-family: var(--mono); font-size: 22px; font-weight: 700;
+    color: var(--text-hi); margin-bottom: 32px;
+  }
+
+  /* ── Architecture diagram ───────────────────────────────────── */
+  .arch-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+  }
+  .arch-card {
+    background: var(--space-900);
+    border: 1px solid var(--space-600);
+    border-radius: 6px;
+    padding: 20px;
+    position: relative;
+    overflow: hidden;
+    transition: border-color .2s, box-shadow .2s;
+  }
+  .arch-card::before {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0; height: 2px;
+  }
+  .arch-card.cyan::before  { background: var(--cyan); }
+  .arch-card.amber::before { background: var(--amber); }
+  .arch-card.green::before { background: var(--green); }
+  .arch-card:hover { border-color: var(--space-700); box-shadow: 0 4px 32px rgba(34,211,238,0.08); }
+  .card-icon { font-size: 24px; margin-bottom: 12px; }
+  .card-title {
+    font-family: var(--mono); font-size: 13px; font-weight: 700;
+    color: var(--text-hi); margin-bottom: 6px;
+  }
+  .card-file {
+    font-family: var(--mono); font-size: 10px; color: var(--amber);
+    margin-bottom: 10px;
+  }
+  .card-desc { font-size: 12px; color: var(--text-mid); line-height: 1.6; }
+  .card-tags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 12px; }
+  .tag {
+    font-family: var(--mono); font-size: 9px; font-weight: 600;
+    letter-spacing: 0.06em; text-transform: uppercase;
+    padding: 3px 8px; border-radius: 3px;
+    background: var(--space-700); color: var(--text-mid);
+    border: 1px solid var(--space-600);
+  }
+
+  /* ── Test results table ─────────────────────────────────────── */
+  .test-grid { display: flex; flex-direction: column; gap: 6px; }
+  .test-row {
+    display: flex; align-items: center; gap: 12px;
+    font-family: var(--mono); font-size: 11px;
+    background: var(--space-900);
+    border: 1px solid var(--space-700);
+    border-radius: 4px; padding: 8px 14px;
+  }
+  .test-icon { width: 16px; text-align: center; }
+  .test-name { color: var(--text-hi); flex: 1; }
+  .test-suite { color: var(--text-lo); min-width: 140px; font-size: 10px; }
+  .test-time  { color: var(--text-lo); min-width: 60px; text-align: right; }
+  .pass { color: var(--green); }
+  .fail { color: var(--red); }
+  .test-summary {
+    display: flex; align-items: center; gap: 24px;
+    margin-top: 16px; padding: 14px 20px;
+    background: var(--space-900);
+    border: 1px solid var(--green);
+    border-radius: 6px;
+    font-family: var(--mono); font-size: 13px;
+  }
+  .summary-num { font-size: 28px; font-weight: 700; }
+  .summary-num.green { color: var(--green); }
+
+  /* ── Telemetry live sim ─────────────────────────────────────── */
+  .tlm-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px;
+    margin-bottom: 24px;
+  }
+  .tlm-card {
+    background: var(--space-900);
+    border: 1px solid var(--space-700);
+    border-radius: 6px; padding: 16px;
+  }
+  .tlm-label { font-family: var(--mono); font-size: 9px; color: var(--text-lo); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 6px; }
+  .tlm-value { font-family: var(--mono); font-size: 22px; font-weight: 700; color: var(--text-hi); }
+  .tlm-unit  { font-size: 12px; color: var(--text-lo); margin-left: 4px; }
+  .tlm-bar   { height: 3px; background: var(--space-700); border-radius: 2px; margin-top: 10px; overflow: hidden; }
+  .tlm-fill  { height: 100%; border-radius: 2px; transition: width .8s ease; }
+  .tlm-fill.cyan  { background: var(--cyan); }
+  .tlm-fill.amber { background: var(--amber); }
+  .tlm-fill.green { background: var(--green); }
+  .tlm-status { font-family: var(--mono); font-size: 10px; margin-top: 6px; }
+  .status-ok   { color: var(--green); }
+  .status-warn { color: var(--amber); }
+  .status-err  { color: var(--red); }
+
+  /* ── Stack pills ────────────────────────────────────────────── */
+  .stack { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+  .pill {
+    font-family: var(--mono); font-size: 11px; font-weight: 600;
+    padding: 6px 14px; border-radius: 4px;
+    border: 1px solid var(--space-600);
+    background: var(--space-800);
+    color: var(--text-mid);
+    letter-spacing: 0.04em;
+  }
+  .pill.hl { border-color: var(--cyan-dim); color: var(--cyan); }
+  .pill.am { border-color: var(--amber-dim); color: var(--amber); }
+
+  /* ── Footer ─────────────────────────────────────────────────── */
+  footer {
+    border-top: 1px solid var(--grid-line);
+    padding: 32px 0;
+    display: flex; justify-content: space-between; align-items: center;
+    font-family: var(--mono); font-size: 11px; color: var(--text-lo);
+  }
+  footer a { color: var(--cyan); text-decoration: none; }
+  footer a:hover { text-decoration: underline; }
+
+  /* ── Responsive ─────────────────────────────────────────────── */
+  @media (max-width: 768px) {
+    .hero { grid-template-columns: 1fr; }
+    .arch-grid { grid-template-columns: 1fr; }
+    .tlm-grid  { grid-template-columns: repeat(2, 1fr); }
+    .test-suite, .test-time { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<canvas id="starfield"></canvas>
+
+<div class="page">
+  <!-- Nav -->
+  <nav>
+    <div class="nav-logo">obs<span>c</span>sw</div>
+    <ul class="nav-links">
+      <li><a href="#architecture">Architecture</a></li>
+      <li><a href="#telemetry">Live Sim</a></li>
+      <li><a href="#tests">Tests</a></li>
+      <li><a href="https://github.com/zTe0/On-Board-Computer-Software-Stack" target="_blank">GitHub ↗</a></li>
+      <li><a href="https://zte0.github.io/Portfolio/" target="_blank">Portfolio ↗</a></li>
+    </ul>
+  </nav>
+
+  <!-- Hero -->
+  <section class="hero">
+    <div class="hero-copy">
+      <div class="hero-eyebrow">Satellite Flight Software · C++17</div>
+      <h1>On-Board Computer<br>Software <em>Stack</em></h1>
+      <p class="hero-sub">
+        OBC middleware demonstrating fault detection,
+        JSON/YAML serialization, thread-safe command queuing, and
+        UDP telemetry downlink.
+      </p>
+      <div class="hero-ctas">
+        <!-- <a href="https://github.com" class="btn btn-primary" target="_blank">
+          ⬡ View on GitHub
+        </a> -->
+        <a href="#architecture" class="btn btn-primary">Explore Architecture</a>
+      </div>
+      <div class="stack">
+        <span class="pill hl">C++17</span>
+        <span class="pill hl">CMake</span>
+        <span class="pill hl">Catch2</span>
+        <span class="pill am">nlohmann/json</span>
+        <span class="pill am">yaml-cpp</span>
+        <span class="pill">POSIX UDP</span>
+        <span class="pill">pthread</span>
+      </div>
+    </div>
+
+    <!-- Live terminal -->
+    <div class="terminal">
+      <div class="term-bar">
+        <div class="dot dot-r"></div>
+        <div class="dot dot-y"></div>
+        <div class="dot dot-g"></div>
+        <div class="term-title">obcsw · LOFT-1 · MISSION-ALPHA-2025</div>
+      </div>
+      <div class="term-body" id="terminal-body">
+        <!-- filled by JS -->
+      </div>
+    </div>
+  </section>
+
+  <!-- Architecture -->
+  <section class="section" id="architecture">
+    <div class="section-label">System Design</div>
+    <h2>Subsystem Architecture</h2>
+    <div class="arch-grid">
+
+      <div class="arch-card cyan">
+        <div class="card-icon">⚡</div>
+        <div class="card-title">FaultDetector</div>
+        <div class="card-file">health/FaultDetector.cpp</div>
+        <div class="card-desc">Evaluates every TelemetryFrame against SatelliteConfig thresholds. Fires a typed FaultEvent callback for battery, thermal, CPU, and memory violations. Stateless per-frame; zero heap allocation in the hot path.</div>
+        <div class="card-tags">
+          <span class="tag">callback pattern</span>
+          <span class="tag">zero-alloc</span>
+          <span class="tag">threshold engine</span>
+        </div>
+      </div>
+
+      <div class="arch-card amber">
+        <div class="card-icon">📡</div>
+        <div class="card-title">TelemetryDispatcher</div>
+        <div class="card-file">telemetry/TelemetryDispatcher.cpp</div>
+        <div class="card-desc">Background thread drains a mutex-protected TelemetryFrame queue, serializes each frame to JSON, and sends over UDP to the ground station. Tracks frames sent and dropped via atomics.</div>
+        <div class="card-tags">
+          <span class="tag">UDP socket</span>
+          <span class="tag">std::thread</span>
+          <span class="tag">lock-guard</span>
+        </div>
+      </div>
+
+      <div class="arch-card green">
+        <div class="card-icon">📋</div>
+        <div class="card-title">CommandDeserializer</div>
+        <div class="card-file">serialization/CommandDeserializer.cpp</div>
+        <div class="card-desc">Parses uplink JSON into typed Command structs with opcode validation against an allowlist. Throws std::invalid_argument for unknown opcodes; std::runtime_error on malformed input.</div>
+        <div class="card-tags">
+          <span class="tag">JSON parsing</span>
+          <span class="tag">opcode allowlist</span>
+          <span class="tag">exception safety</span>
+        </div>
+      </div>
+
+      <div class="arch-card cyan">
+        <div class="card-icon">🗂</div>
+        <div class="card-title">CommandQueue</div>
+        <div class="card-file">command/CommandQueue.cpp</div>
+        <div class="card-desc">Thread-safe bounded FIFO with condition_variable–based popWait(). Separate push / tryPop / popWait interface covers polling and blocking consumers with a configurable depth cap.</div>
+        <div class="card-tags">
+          <span class="tag">std::mutex</span>
+          <span class="tag">condition_variable</span>
+          <span class="tag">bounded queue</span>
+        </div>
+      </div>
+
+      <div class="arch-card amber">
+        <div class="card-icon">🔀</div>
+        <div class="card-title">CommandHandler</div>
+        <div class="card-file">command/CommandHandler.cpp</div>
+        <div class="card-desc">Opcode-keyed dispatch table mapping Opcode → std::function callback. dispatchRaw() chains deserialization → dispatch in one call, returning typed CommandResult for each outcome.</div>
+        <div class="card-tags">
+          <span class="tag">dispatch table</span>
+          <span class="tag">std::function</span>
+          <span class="tag">unordered_map</span>
+        </div>
+      </div>
+
+      <div class="arch-card green">
+        <div class="card-icon">⚙️</div>
+        <div class="card-title">ConfigLoader</div>
+        <div class="card-file">serialization/ConfigLoader.cpp</div>
+        <div class="card-desc">Reads satellite.yaml at startup into a SatelliteConfig struct. Validates critical invariants (voltage min &lt; max, non-empty IP). Provides safe defaults for all optional fields.</div>
+        <div class="card-tags">
+          <span class="tag">yaml-cpp</span>
+          <span class="tag">validation</span>
+          <span class="tag">defaults</span>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- Live Telemetry Simulator -->
+  <section class="section" id="telemetry">
+    <div class="section-label">Live Simulation</div>
+    <h2>Telemetry Frame Viewer</h2>
+
+    <div class="tlm-grid">
+      <div class="tlm-card">
+        <div class="tlm-label">Battery Voltage</div>
+        <div class="tlm-value" id="bat-v">7.40<span class="tlm-unit">V</span></div>
+        <div class="tlm-bar"><div class="tlm-fill cyan" id="bat-bar" style="width:70%"></div></div>
+        <div class="tlm-status status-ok" id="bat-status">● NOMINAL</div>
+      </div>
+      <div class="tlm-card">
+        <div class="tlm-label">OBC Temperature</div>
+        <div class="tlm-value" id="obc-tmp">25.0<span class="tlm-unit">°C</span></div>
+        <div class="tlm-bar"><div class="tlm-fill amber" id="tmp-bar" style="width:40%"></div></div>
+        <div class="tlm-status status-ok" id="tmp-status">● NOMINAL</div>
+      </div>
+      <div class="tlm-card">
+        <div class="tlm-label">CPU Usage</div>
+        <div class="tlm-value" id="cpu-val">45<span class="tlm-unit">%</span></div>
+        <div class="tlm-bar"><div class="tlm-fill green" id="cpu-bar" style="width:45%"></div></div>
+        <div class="tlm-status status-ok" id="cpu-status">● NOMINAL</div>
+      </div>
+      <div class="tlm-card">
+        <div class="tlm-label">Memory Usage</div>
+        <div class="tlm-value" id="mem-val">50<span class="tlm-unit">%</span></div>
+        <div class="tlm-bar"><div class="tlm-fill green" id="mem-bar" style="width:50%"></div></div>
+        <div class="tlm-status status-ok" id="mem-status">● NOMINAL</div>
+      </div>
+      <div class="tlm-card">
+        <div class="tlm-label">Solar Input</div>
+        <div class="tlm-value" id="sol-val">8.0<span class="tlm-unit">W</span></div>
+        <div class="tlm-bar"><div class="tlm-fill amber" id="sol-bar" style="width:67%"></div></div>
+        <div class="tlm-status status-ok" id="sol-status">● CHARGING</div>
+      </div>
+      <div class="tlm-card">
+        <div class="tlm-label">Uptime</div>
+        <div class="tlm-value" id="uptime-val">0<span class="tlm-unit">s</span></div>
+        <div class="tlm-bar"><div class="tlm-fill cyan" id="uptime-bar" style="width:0%"></div></div>
+        <div class="tlm-status status-ok" id="uptime-status">● RUNNING</div>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:10px;margin-bottom:20px;">
+      <button class="btn btn-primary" onclick="injectFault('battery')">Inject Battery Fault</button>
+      <button class="btn btn-outline" onclick="injectFault('thermal')">Inject Thermal Fault</button>
+      <button class="btn btn-outline" onclick="injectFault('cpu')">Inject CPU Overload</button>
+      <button class="btn btn-outline" onclick="clearFaults()">Clear Faults</button>
+    </div>
+  </section>
+
+  <!-- Tests -->
+  <section class="section" id="tests">
+    <div class="section-label">Quality Assurance</div>
+    <h2>Unit Test Results</h2>
+
+    <div class="test-grid" id="test-list">
+      <!-- filled by JS -->
+    </div>
+
+    <div class="test-summary" id="test-summary">
+      <div><div class="summary-num green" id="pass-count">27</div><div style="font-size:11px;color:var(--text-lo)">PASSED</div></div>
+      <div><div class="summary-num" id="fail-count" style="color:var(--text-lo)">0</div><div style="font-size:11px;color:var(--text-lo)">FAILED</div></div>
+      <div style="flex:1"></div>
+      <div style="color:var(--green);font-size:13px;">✓ 100% tests passed · 0.22s total</div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer>
+    <span>obcsw · C++17 Satellite OBC Middleware</span>
+    <span>
+      <a href="https://github.com/zTe0/On-Board-Computer-Software-Stack" target="_blank">github.com/obcsw</a>
+      &nbsp;·&nbsp;
+      Author: Matteo Luciardello Lecardi
+    </span>
+  </footer>
+</div>
+
+<script>
+// ── Star-field ───────────────────────────────────────────────
+(function() {
+  const c = document.getElementById('starfield');
+  const ctx = c.getContext('2d');
+  let stars = [];
+  function resize() {
+    c.width = window.innerWidth; c.height = window.innerHeight;
+    stars = Array.from({length: 180}, () => ({
+      x: Math.random() * c.width,
+      y: Math.random() * c.height,
+      r: Math.random() * 1.2 + 0.2,
+      a: Math.random(),
+      da: (Math.random() - 0.5) * 0.003,
+    }));
+  }
+  function draw() {
+    ctx.clearRect(0, 0, c.width, c.height);
+    stars.forEach(s => {
+      s.a = Math.max(0.05, Math.min(1, s.a + s.da));
+      if (s.a <= 0.05 || s.a >= 1) s.da *= -1;
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(200,220,255,${s.a})`;
+      ctx.fill();
+    });
+    requestAnimationFrame(draw);
+  }
+  window.addEventListener('resize', resize);
+  resize(); draw();
+})();
+
+// ── Terminal feed ────────────────────────────────────────────
+const termBody = document.getElementById('terminal-body');
+let termLines = [];
+let frameCounter = 0;
+let t = 0;
+let faultMode = null;
+
+function termAdd(html) {
+  termLines.push(html);
+  if (termLines.length > 20) termLines.shift();
+  termBody.innerHTML = termLines.join('\n') + '\n<div class="term-line"><span class="cursor"></span></div>';
+}
+
+function ts() {
+  const n = Date.now();
+  const ms = String(n % 1000).padStart(3, '0');
+  return `<span class="t-ts">[${String(Math.floor(n/1000) % 86400).padStart(5,'0')}.${ms}]</span>`;
+}
+
+function pad(n, l=4) { return String(n).padStart(l, ' '); }
+
+// ── Telemetry simulation state ───────────────────────────────
+let batV = 7.4, obcTmp = 25.0, cpu = 45, mem = 50, sol = 8.0, uptime = 0;
+let faultBat = false, faultTmp = false, faultCpu = false;
+
+window.injectFault = function(type) {
+  faultMode = type;
+  if (type === 'battery') { faultBat = true; faultTmp = false; faultCpu = false; }
+  if (type === 'thermal')  { faultTmp = true; faultBat = false; faultCpu = false; }
+  if (type === 'cpu')      { faultCpu = true; faultBat = false; faultTmp = false; }
+  termAdd(`${ts()} <span class="t-warn">[INJECT]</span> <span class="t-val">Fault injected: ${type.toUpperCase()}</span>`);
+};
+
+window.clearFaults = function() {
+  faultBat = faultTmp = faultCpu = false; faultMode = null;
+  termAdd(`${ts()} <span class="t-ok">[RESET ]</span> <span class="t-val">All fault injections cleared</span>`);
+};
+
+function updateTelemetry() {
+  t += 1;
+  uptime++;
+
+  // Nominal orbital drift
+  const cycle = Math.sin(t / 100);
+  batV = faultBat ? 5.8 : 7.4 + 0.6 * cycle;
+  obcTmp = faultTmp ? 91.0 : 25 + 15 * Math.sin(t / 80);
+  cpu  = faultCpu ? 95 : Math.min(89, 30 + Math.abs(Math.sin(t / 30)) * 50);
+  mem  = Math.min(84, 40 + Math.abs(Math.sin(t / 45)) * 35);
+  sol  = Math.max(0, 12 * cycle);
+
+  // ── Update cards ────────────────────────────────────────────
+  document.getElementById('bat-v').innerHTML = batV.toFixed(2) + '<span class="tlm-unit">V</span>';
+  document.getElementById('bat-bar').style.width = ((batV - 5) / 4 * 100).toFixed(0) + '%';
+  const batOk = batV >= 6.5 && batV <= 8.4;
+  setStatus('bat-status', batOk, batOk ? 'NOMINAL' : (batV < 6.5 ? 'LOW BATTERY' : 'OVERCHARGE'));
+
+  document.getElementById('obc-tmp').innerHTML = obcTmp.toFixed(1) + '<span class="tlm-unit">°C</span>';
+  document.getElementById('tmp-bar').style.width = ((obcTmp + 20) / 105 * 100).toFixed(0) + '%';
+  const tmpOk = obcTmp >= -20 && obcTmp <= 85;
+  setStatus('tmp-status', tmpOk, tmpOk ? 'NOMINAL' : (obcTmp > 85 ? 'OVER TEMP' : 'UNDER TEMP'));
+
+  document.getElementById('cpu-val').innerHTML = Math.round(cpu) + '<span class="tlm-unit">%</span>';
+  document.getElementById('cpu-bar').style.width = cpu.toFixed(0) + '%';
+  setStatus('cpu-status', cpu < 90, cpu < 90 ? 'NOMINAL' : 'CPU OVERLOAD');
+
+  document.getElementById('mem-val').innerHTML = Math.round(mem) + '<span class="tlm-unit">%</span>';
+  document.getElementById('mem-bar').style.width = mem.toFixed(0) + '%';
+  setStatus('mem-status', mem < 85, mem < 85 ? 'NOMINAL' : 'MEM OVERLOAD');
+
+  document.getElementById('sol-val').innerHTML = sol.toFixed(1) + '<span class="tlm-unit">W</span>';
+  document.getElementById('sol-bar').style.width = (sol / 12 * 100).toFixed(0) + '%';
+  document.getElementById('sol-status').textContent = sol > 0.5 ? '● CHARGING' : '● ECLIPSE';
+  document.getElementById('sol-status').className = 'tlm-status ' + (sol > 0.5 ? 'status-ok' : 'status-warn');
+
+  document.getElementById('uptime-val').innerHTML = uptime + '<span class="tlm-unit">s</span>';
+  document.getElementById('uptime-bar').style.width = Math.min(100, uptime / 3 * 100).toFixed(0) + '%';
+
+  // ── Terminal output ──────────────────────────────────────────
+  if (t % 2 === 0) {
+    const allOk = batOk && tmpOk && cpu < 90 && mem < 85;
+    const tag = allOk ? '<span class="t-ok">[TLM  ]</span>' : '<span class="t-warn">[TLM  ]</span>';
+    termAdd(`${ts()} ${tag} <span class="t-val">frame=${pad(frameCounter++)} bat=${batV.toFixed(2)}V obc_tmp=${obcTmp.toFixed(1)}°C cpu=${Math.round(cpu)}% mem=${Math.round(mem)}%</span>`);
+  }
+
+  if (!batOk) termAdd(`${ts()} <span class="t-err">[FAULT]</span> <span class="t-val">LOW_BATTERY measured=${batV.toFixed(2)} threshold=6.50</span>`);
+  if (!tmpOk) termAdd(`${ts()} <span class="t-err">[FAULT]</span> <span class="t-val">OVER_TEMPERATURE measured=${obcTmp.toFixed(1)} threshold=85.0</span>`);
+  if (cpu >= 90) termAdd(`${ts()} <span class="t-err">[FAULT]</span> <span class="t-val">CPU_OVERLOAD measured=${Math.round(cpu)} threshold=90</span>`);
+}
+
+function setStatus(id, ok, label) {
+  const el = document.getElementById(id);
+  el.textContent = '● ' + label;
+  el.className = 'tlm-status ' + (ok ? 'status-ok' : 'status-err');
+}
+
+// Boot sequence
+setTimeout(() => {
+  termAdd(`${ts()} <span class="t-ok">[BOOT ]</span> <span class="t-val">obcsw v1.0.0 — LOFT-1 MISSION-ALPHA-2025</span>`);
+}, 200);
+setTimeout(() => {
+  termAdd(`${ts()} <span class="t-ok">[CFG  ]</span> <span class="t-val">Config loaded: satellite.yaml</span>`);
+}, 600);
+setTimeout(() => {
+  termAdd(`${ts()} <span class="t-ok">[DISP ]</span> <span class="t-val">TelemetryDispatcher started → 127.0.0.1:5005</span>`);
+}, 1000);
+setTimeout(() => {
+  termAdd(`${ts()} <span class="t-ok">[CMD  ]</span> <span class="t-val">CommandQueue ready (depth=32)</span>`);
+}, 1400);
+setTimeout(() => {
+  termAdd(`${ts()} <span class="t-ok">[MAIN ]</span> <span class="t-val">OBC loop running — awaiting telemetry frames</span>`);
+  setInterval(updateTelemetry, 1200);
+}, 1800);
+
+// ── Test results ─────────────────────────────────────────────
+const tests = [
+  { name: 'no fault on nominal frame',                   suite: 'FaultDetector',          ms: 0 },
+  { name: 'LOW_BATTERY on under-voltage',                suite: 'FaultDetector',          ms: 0 },
+  { name: 'LOW_BATTERY on over-voltage',                 suite: 'FaultDetector',          ms: 0 },
+  { name: 'OVER_TEMPERATURE on high OBC temp',           suite: 'FaultDetector',          ms: 0 },
+  { name: 'UNDER_TEMPERATURE on cold OBC temp',          suite: 'FaultDetector',          ms: 0 },
+  { name: 'CPU_OVERLOAD on high CPU usage',              suite: 'FaultDetector',          ms: 0 },
+  { name: 'MEMORY_OVERLOAD on high memory usage',        suite: 'FaultDetector',          ms: 0 },
+  { name: 'multiple faults fired in one frame',          suite: 'FaultDetector',          ms: 0 },
+  { name: 'no callback set — no crash',                  suite: 'FaultDetector',          ms: 0 },
+  { name: 'round-trip toJson / fromJson',                suite: 'TelemetrySerializer',    ms: 0 },
+  { name: 'fromJson throws on invalid JSON',             suite: 'TelemetrySerializer',    ms: 0 },
+  { name: 'batchToJson produces valid JSON array',       suite: 'TelemetrySerializer',    ms: 0 },
+  { name: 'JSON contains expected keys',                 suite: 'TelemetrySerializer',    ms: 0 },
+  { name: 'parse valid NOOP command',                    suite: 'CommandDeserializer',    ms: 0 },
+  { name: 'parse SET_MODE with subsystem and params',    suite: 'CommandDeserializer',    ms: 0 },
+  { name: 'throws on unknown opcode',                    suite: 'CommandDeserializer',    ms: 0 },
+  { name: 'throws on malformed JSON',                    suite: 'CommandDeserializer',    ms: 0 },
+  { name: 'throws on missing required fields',           suite: 'CommandDeserializer',    ms: 0 },
+  { name: 'opcodeName returns correct string',           suite: 'CommandDeserializer',    ms: 0 },
+  { name: 'dispatch registered handler',                 suite: 'CommandHandler',         ms: 0 },
+  { name: 'REJECTED when no handler registered',         suite: 'CommandHandler',         ms: 0 },
+  { name: 'REJECTED on unknown opcode',                  suite: 'CommandHandler',         ms: 0 },
+  { name: 'basic push and tryPop',                       suite: 'CommandQueue',           ms: 0 },
+  { name: 'push beyond max_depth returns false',         suite: 'CommandQueue',           ms: 0 },
+  { name: 'tryPop returns nullopt when empty',           suite: 'CommandQueue',           ms: 0 },
+  { name: 'popWait times out on empty queue',            suite: 'CommandQueue',           ms: 101 },
+  { name: 'popWait receives item from another thread',   suite: 'CommandQueue',           ms: 54 },
+];
+
+const list = document.getElementById('test-list');
+tests.forEach(t => {
+  const row = document.createElement('div');
+  row.className = 'test-row';
+  row.innerHTML = `
+    <div class="test-icon pass">✓</div>
+    <div class="test-name">${t.name}</div>
+    <div class="test-suite">${t.suite}</div>
+    <div class="test-time">${t.ms}ms</div>
+  `;
+  list.appendChild(row);
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,92 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # ---------------------------------------------------------------
+  # Build + test on Linux (GCC)
+  # ---------------------------------------------------------------
+  build-linux-gcc:
+    name: Linux · GCC · Release
+    runs-on: ubuntu-22.04
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y cmake build-essential
+
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build --parallel $(nproc)
+
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+
+  # ---------------------------------------------------------------
+  # Build + test on Linux (Clang) with ASan/UBSan
+  # ---------------------------------------------------------------
+  build-linux-clang-debug:
+    name: Linux · Clang · Debug + Sanitizers
+    runs-on: ubuntu-22.04
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y cmake clang-14 build-essential
+
+      - name: Configure
+        env:
+          CC: clang-14
+          CXX: clang++-14
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
+
+      - name: Build
+        run: cmake --build build --parallel $(nproc)
+
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+
+  # ---------------------------------------------------------------
+  # Deploy portfolio page to GitHub Pages
+  # ---------------------------------------------------------------
+  deploy-pages:
+    name: Deploy Web Dashboard
+    needs: [build-linux-gcc]
+    runs-on: ubuntu-22.04
+    if: github.ref == 'refs/heads/main'
+
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: web/
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
